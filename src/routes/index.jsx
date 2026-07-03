@@ -6,6 +6,7 @@ import RoleRoute from './RoleRoute';
 import LoginPage from '../pages/LoginPage';
 import ForgotPasswordPage from '../pages/ForgotPasswordPage';
 import ResetPasswordPage from '../pages/ResetPasswordPage';
+import TrialExpiredPage from '../pages/TrialExpiredPage';
 import DashboardPage from '../pages/DashboardPage';
 import LivestockPage from '../pages/LivestockPage';
 import AnimalDetailPage from '../pages/AnimalDetailPage';
@@ -20,9 +21,9 @@ import FinancePage from '../pages/FinancePage';
 import TeamPage from '../pages/TeamPage';
 import TasksPage from '../pages/TasksPage';
 import WeatherPage from '../pages/WeatherPage';
+import ReportsPage from '../pages/ReportsPage';
 import SettingsPage from '../pages/SettingsPage';
 import AIChatPage from '../pages/AIChatPage';
-import ReportsPage from '../pages/ReportsPage';
 import NotFoundPage from '../pages/NotFoundPage';
 
 export default function AppRoutes() {
@@ -31,6 +32,7 @@ export default function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/trial-expired" element={<TrialExpiredPage />} />
 
       <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
         <Route path="/" element={<DashboardPage />} />
@@ -47,8 +49,7 @@ export default function AppRoutes() {
         <Route path="/team" element={<RoleRoute roles={['farmAdmin', 'manager']}><TeamPage /></RoleRoute>} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/weather" element={<WeatherPage />} />
-        
-<Route path="/reports" element={<ReportsPage />} />
+        <Route path="/reports" element={<ReportsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/ai" element={<AIChatPage />} />
       </Route>

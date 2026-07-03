@@ -31,28 +31,39 @@ const suggestions = {
   ],
 };
 
-const greetings = {
-  en: (name, farm) => `Hello ${name?.split(' ')[0] || 'there'}! 👋 I'm your FarmWise AI assistant. I can see everything on ${farm?.name || 'your farm'} — animals, health, production, weather, and more. Ask me anything!`,
-  sw: (name, farm) => `Habari ${name?.split(' ')[0] || 'rafiki'}! 👋 Mimi ni msaidizi wako wa FarmWise AI. Ninaweza kuona kila kitu kwenye ${farm?.name || 'shamba lako'} — wanyama, afya, uzalishaji, hali ya hewa, na zaidi. Niulize chochote!`,
-};
-
 export default function AIChatPage() {
   const { user, farm } = useAuth();
-  const [language, setLanguage] = useState(() => localStorage.getItem('farmwise_ai_language') || 'en');
+
+  const [language, setLanguage] = useState(() => {
+    try {
+      const saved = localStorage.getItem('farmwise_ai_language');
+      if (saved === 'en' || saved === 'sw') return saved;
+    } catch {}
+    return 'en';
+  });
+
   const [messages, setMessages] = useState(() => {
-    const saved = localStorage.getItem('farmwise_chat_history');
-    if (saved) {
-      try { return JSON.parse(saved); } catch { return []; }
+    try {
+      const saved = localStorage.getItem('farmwise_chat_history');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const valid = parsed.filter((m) => m && typeof m.content === 'string' && typeof m.role === 'string');
+          if (valid.length > 0) return valid;
+        }
+      }
+    } catch {
+      localStorage.removeItem('farmwise_chat_history');
     }
-    const lang = localStorage.getItem('farmwise_ai_language') || 'en';
     return [
       {
         role: 'assistant',
-        content: greetings[lang](user, farm),
+        content: `Hello ${user?.name?.split(' ')[0] || 'there'}! 👋 I'm your FarmWise AI assistant. I can see everything on ${farm?.name || 'your farm'} — animals, health, production, weather, and more. Ask me anything!`,
         timestamp: new Date().toISOString(),
       },
     ];
   });
+
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
@@ -63,11 +74,16 @@ export default function AIChatPage() {
   }, [messages]);
 
   useEffect(() => {
-    localStorage.setItem('farmwise_chat_history', JSON.stringify(messages.slice(-50)));
+    try {
+      const toSave = messages.slice(-50);
+      localStorage.setItem('farmwise_chat_history', JSON.stringify(toSave));
+    } catch {}
   }, [messages]);
 
   useEffect(() => {
-    localStorage.setItem('farmwise_ai_language', language);
+    try {
+      localStorage.setItem('farmwise_ai_language', language);
+    } catch {}
   }, [language]);
 
   const toggleLanguage = () => {
@@ -95,7 +111,7 @@ export default function AIChatPage() {
     setLoading(true);
 
     try {
-      const res = await chatApi({ message: userMessage, language });
+      const res = await chatApi({ message: userMessage, language: typeof language === 'string' ? language : 'en' });
       setMessages([...newMessages, { role: 'assistant', content: res.data.data.reply, timestamp: new Date().toISOString() }]);
     } catch {
       setMessages([...newMessages, {
@@ -128,14 +144,15 @@ export default function AIChatPage() {
         timestamp: new Date().toISOString(),
       },
     ]);
-    localStorage.removeItem('farmwise_chat_history');
+    try { localStorage.removeItem('farmwise_chat_history'); } catch {}
   };
 
   const formatTime = (timestamp) => {
+    if (!timestamp) return '';
     return new Date(timestamp).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
   };
 
-  const currentSuggestions = suggestions[language];
+  const currentSuggestions = suggestions[language] || suggestions.en;
 
   return (
     <div className="flex flex-col h-[calc(100vh-7rem)]">
@@ -210,7 +227,7 @@ export default function AIChatPage() {
                         : 'bg-primary-600 text-white rounded-tr-md'
                     )}
                   >
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                    <p className="whitespace-pre-wrap">{msg.content || ''}</p>
                   </div>
                   <p className={clsx(
                     'text-[10px] text-gray-400 mt-1',

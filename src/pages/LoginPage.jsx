@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { login as loginApi } from '../api/authApi';
@@ -14,12 +14,29 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [supportPhone, setSupportPhone] = useState('');
 
   const { loginUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const from = location.state?.from?.pathname || '/';
+
+  useEffect(() => {
+    fetchSupportPhone();
+  }, []);
+
+  const fetchSupportPhone = async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/support`);
+      const data = await res.json();
+      if (data.success && data.data?.phone) {
+        setSupportPhone(data.data.phone);
+      }
+    } catch {
+      // Silently fail — just hide the number
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -61,7 +78,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <img src="/logo.svg" alt="FarmWise" className="w-16 h-16 mx-auto mb-4" />
@@ -152,6 +169,14 @@ export default function LoginPage() {
         <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-6">
           Contact your farm administrator if you need access.
         </p>
+        {supportPhone && (
+          <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Need help? Call{' '}
+            <a href={`tel:${supportPhone}`} className="text-primary-600 hover:text-primary-700 font-medium">
+              {supportPhone}
+            </a>
+          </p>
+        )}
       </div>
     </div>
   );

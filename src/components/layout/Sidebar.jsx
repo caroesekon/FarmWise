@@ -15,6 +15,7 @@ import {
   Cloud,
   Settings,
   FileText,
+  X,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../../hooks/useAuth';
@@ -30,26 +31,28 @@ const links = [
   { to: '/inventory', icon: Package, label: 'Inventory' },
   { to: '/equipment', icon: Wrench, label: 'Equipment' },
   { to: '/finances', icon: DollarSign, label: 'Finances' },
-  { to: '/reports', icon: FileText, label: 'Reports' },
   { to: '/team', icon: Users, label: 'Team' },
   { to: '/tasks', icon: ClipboardList, label: 'Tasks' },
   { to: '/weather', icon: Cloud, label: 'Weather' },
+  { to: '/reports', icon: FileText, label: 'Reports' },
 ];
 
-export default function Sidebar({ open }) {
+export default function Sidebar({ open, isMobile, onClose }) {
   const { farm } = useAuth();
 
   return (
     <aside
       className={clsx(
-        'fixed top-0 left-0 h-full bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 z-40 transition-all duration-200 flex flex-col',
-        open ? 'w-64' : 'w-20'
+        'bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 z-40 transition-all duration-200 flex flex-col',
+        isMobile
+          ? 'fixed top-0 left-0 h-full w-64 shadow-xl'
+          : clsx('fixed top-0 left-0 h-full', open ? 'w-64' : 'w-20')
       )}
     >
       <div className="flex items-center gap-3 px-4 h-16 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
         <img src="/logo.svg" alt="FarmWise" className="w-8 h-8 flex-shrink-0" />
-        {open && (
-          <div className="min-w-0">
+        {(open || isMobile) && (
+          <div className="min-w-0 flex-1">
             <span className="text-lg font-bold text-gray-900 dark:text-white block leading-tight">FarmWise</span>
             {farm?.name && (
               <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 block truncate leading-tight">
@@ -57,6 +60,11 @@ export default function Sidebar({ open }) {
               </span>
             )}
           </div>
+        )}
+        {isMobile && (
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="h-5 w-5" />
+          </button>
         )}
       </div>
 
@@ -66,27 +74,33 @@ export default function Sidebar({ open }) {
             key={to}
             to={to}
             end={to === '/'}
+            onClick={isMobile ? onClose : undefined}
             className={({ isActive }) =>
-              clsx(
-                'sidebar-link',
-                isActive && 'active'
-              )
+              clsx('sidebar-link', isActive && 'active')
             }
           >
             <Icon className="h-5 w-5 flex-shrink-0" />
-            {open && <span>{label}</span>}
+            {(open || isMobile) && <span>{label}</span>}
           </NavLink>
         ))}
       </nav>
 
       <div className="p-3 border-t border-gray-200 dark:border-gray-800 flex-shrink-0 space-y-1">
-        <NavLink to="/ai" className={({ isActive }) => clsx('sidebar-link', isActive && 'active')}>
+        <NavLink
+          to="/ai"
+          onClick={isMobile ? onClose : undefined}
+          className={({ isActive }) => clsx('sidebar-link', isActive && 'active')}
+        >
           <span className="text-lg flex-shrink-0">🤖</span>
-          {open && <span>AI Assistant</span>}
+          {(open || isMobile) && <span>AI Assistant</span>}
         </NavLink>
-        <NavLink to="/settings" className={({ isActive }) => clsx('sidebar-link', isActive && 'active')}>
+        <NavLink
+          to="/settings"
+          onClick={isMobile ? onClose : undefined}
+          className={({ isActive }) => clsx('sidebar-link', isActive && 'active')}
+        >
           <Settings className="h-5 w-5 flex-shrink-0" />
-          {open && <span>Settings</span>}
+          {(open || isMobile) && <span>Settings</span>}
         </NavLink>
       </div>
     </aside>

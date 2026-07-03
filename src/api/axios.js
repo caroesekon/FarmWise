@@ -24,6 +24,11 @@ api.interceptors.response.use(
       localStorage.removeItem('farmwise_user');
       window.location.href = '/login';
     }
+
+    if (error.response?.status === 403 && error.response?.data?.code === 'TRIAL_EXPIRED') {
+      window.location.href = '/trial-expired';
+    }
+
     return Promise.reject(error);
   }
 );
