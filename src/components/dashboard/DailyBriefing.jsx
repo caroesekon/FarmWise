@@ -1,6 +1,6 @@
 import Card from '../ui/Card';
 import Badge from '../ui/Badge';
-import { Calendar, Cloud, AlertTriangle, TrendingUp } from 'lucide-react';
+import { Calendar, Cloud, AlertTriangle } from 'lucide-react';
 
 export default function DailyBriefing({ briefing }) {
   if (!briefing) return null;
@@ -50,7 +50,7 @@ export default function DailyBriefing({ briefing }) {
 
       {briefing.upcoming?.length > 0 && (
         <div className="mb-4">
-          <h3 className="text-sm font-semibold text-yellow-600 dark:text-yellow-400 mb-2">Upcoming</h3>
+          <h3 className="text-sm font-semibold text-yellow-600 dark:text-yellow-400 mb-2">🟡 Upcoming (Next 3 Days)</h3>
           <div className="space-y-2">
             {briefing.upcoming.map((a, i) => (
               <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-yellow-50 dark:bg-yellow-950/20">
@@ -65,13 +65,9 @@ export default function DailyBriefing({ briefing }) {
         </div>
       )}
 
-      {briefing.snapshot && (
-        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-          <TrendingUp className="h-4 w-4" />
-          <span>
-            {briefing.snapshot.milk && `Milk: ${briefing.snapshot.milk.today}L`}
-            {briefing.snapshot.eggs && ` · Eggs: ${briefing.snapshot.eggs.today}`}
-          </span>
+      {!briefing.criticalActions?.length && !briefing.upcoming?.length && (
+        <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/20">
+          <p className="text-sm text-green-600 dark:text-green-400">✅ All clear today. No pending actions.</p>
         </div>
       )}
     </Card>
