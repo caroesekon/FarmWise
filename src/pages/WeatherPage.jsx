@@ -7,11 +7,8 @@ export default function WeatherPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Weather"
-        description="Current conditions and forecast for your farm"
-      />
-      <WeatherDetail weather={weather} loading={loading} />
+      <PageHeader title="Weather" description="Current conditions, forecast, and seasonal advisory" />
+      <WeatherDetail current={weather} loading={loading} />
     </div>
   );
 }

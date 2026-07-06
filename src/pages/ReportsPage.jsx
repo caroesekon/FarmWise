@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
 import Spinner from '../components/ui/Spinner';
 import Badge from '../components/ui/Badge';
 import { getAnimals } from '../api/animalApi';
@@ -10,17 +11,19 @@ import { getFinances } from '../api/financeApi';
 import { getVaccinations } from '../api/vaccinationApi';
 import { getInventory } from '../api/inventoryApi';
 import { getTasks } from '../api/taskApi';
+import { getCrops } from '../api/cropApi';
 import { getFarm } from '../api/farmApi';
 import { formatDate, formatCurrency } from '../utils/formatters';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../context/AuthContext';
 import {
   Printer, Beef, Milk, Egg, DollarSign, Syringe, Package,
-  ClipboardList, TrendingUp, TrendingDown, FileText
+  ClipboardList, Wheat, Filter,
 } from 'lucide-react';
 
 const tabs = [
   { key: 'livestock', label: 'Livestock', icon: Beef },
   { key: 'production', label: 'Production', icon: Milk },
+  { key: 'crops', label: 'Crops', icon: Wheat },
   { key: 'financial', label: 'Financial', icon: DollarSign },
   { key: 'vaccination', label: 'Vaccination', icon: Syringe },
   { key: 'inventory', label: 'Inventory', icon: Package },
@@ -30,6 +33,7 @@ const tabs = [
 const reportTitles = {
   livestock: 'Livestock Report',
   production: 'Production Report',
+  crops: 'Crop Report',
   financial: 'Financial Report',
   vaccination: 'Vaccination Report',
   inventory: 'Inventory Report',
@@ -42,56 +46,54 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState({});
   const [farmData, setFarmData] = useState(null);
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
   const printRef = useRef(null);
 
   useEffect(() => { fetchFarm(); }, []);
-  useEffect(() => { fetchData(); }, [activeTab]);
+  useEffect(() => { fetchData(); }, [activeTab, startDate, endDate]);
 
   const fetchFarm = async () => {
-    try {
-      const res = await getFarm();
-      setFarmData(res.data.data);
-    } catch {}
+    try { const res = await getFarm(); setFarmData(res.data.data); } catch {}
   };
 
   const fetchData = async () => {
     setLoading(true);
     try {
+      const sDate = new Date(startDate); sDate.setHours(0, 0, 0, 0);
+      const eDate = new Date(endDate); eDate.setHours(23, 59, 59, 999);
+
       switch (activeTab) {
         case 'livestock': {
           const res = await getAnimals({ limit: 500 });
           const animals = res.data.data || [];
           const byCategory = {};
-          const byStatus = {};
-          animals.forEach((a) => {
-            byCategory[a.category] = (byCategory[a.category] || 0) + 1;
-            byStatus[a.status] = (byStatus[a.status] || 0) + 1;
-          });
-          setData({ animals, byCategory, byStatus, total: animals.length });
+          animals.forEach((a) => { byCategory[a.category] = (byCategory[a.category] || 0) + 1; });
+          setData({ animals, byCategory, total: animals.length });
           break;
         }
         case 'production': {
-          const endDate = new Date();
-          endDate.setHours(23, 59, 59, 999);
-          const startDate = new Date();
-          startDate.setDate(startDate.getDate() - 30);
-          startDate.setHours(0, 0, 0, 0);
-          const res = await getProduction({ startDate: startDate.toISOString(), endDate: endDate.toISOString(), limit: 1000 });
+          const res = await getProduction({ startDate: sDate.toISOString(), endDate: eDate.toISOString(), limit: 1000 });
           const records = res.data.data || [];
           const totalMilk = records.filter((r) => r.type === 'milk').reduce((s, r) => s + r.quantity, 0);
           const totalEggs = records.filter((r) => r.type === 'eggs').reduce((s, r) => s + r.quantity, 0);
-          const byDay = {};
-          records.forEach((r) => {
-            const day = new Date(r.date).toLocaleDateString('en-KE', { weekday: 'short', month: 'short', day: 'numeric' });
-            if (!byDay[day]) byDay[day] = { milk: 0, eggs: 0 };
-            if (r.type === 'milk') byDay[day].milk += r.quantity;
-            if (r.type === 'eggs') byDay[day].eggs += r.quantity;
-          });
-          setData({ records, totalMilk, totalEggs, byDay });
+          const totalValue = records.reduce((s, r) => s + (r.value || 0), 0);
+          setData({ records, totalMilk, totalEggs, totalValue });
+          break;
+        }
+        case 'crops': {
+          const res = await getCrops({ limit: 200 });
+          const crops = res.data.data || [];
+          const harvested = crops.filter((c) => c.status === 'harvested');
+          const growing = crops.filter((c) => c.status === 'growing');
+          setData({ crops, harvested, growing });
           break;
         }
         case 'financial': {
-          const res = await getFinances({ limit: 500 });
+          const res = await getFinances({ startDate: sDate.toISOString(), endDate: eDate.toISOString(), limit: 500 });
           const records = res.data.data || [];
           const summary = res.data.summary || { totalIncome: 0, totalExpense: 0, balance: 0 };
           setData({ records, summary });
@@ -124,9 +126,7 @@ export default function ReportsPage() {
     } catch {} finally { setLoading(false); }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = () => { window.print(); };
 
   const now = new Date();
   const dateTimeStr = now.toLocaleDateString('en-KE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) +
@@ -136,6 +136,8 @@ export default function ReportsPage() {
   const farmLocation = displayFarm?.location?.county
     ? `${displayFarm.location.county}${displayFarm.location.subCounty ? ', ' + displayFarm.location.subCounty : ''}`
     : '';
+
+  const showDateFilter = ['production', 'financial'].includes(activeTab);
 
   if (loading) return <Spinner className="py-20" size="lg" />;
 
@@ -148,7 +150,7 @@ export default function ReportsPage() {
         </Button>
       </div>
 
-      <div className="flex gap-1 mb-6 overflow-x-auto pb-1 no-print">
+      <div className="flex gap-1 mb-4 overflow-x-auto pb-1 no-print">
         {tabs.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -164,10 +166,18 @@ export default function ReportsPage() {
         ))}
       </div>
 
+      {showDateFilter && (
+        <div className="flex gap-3 mb-4 no-print items-end">
+          <Input label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          <Input label="End Date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        </div>
+      )}
+
       <div className="print-area" ref={printRef}>
         <div className="print-header">
           <h1>{reportTitles[activeTab]}</h1>
           <p>{displayFarm?.name || 'Farm'}{farmLocation ? ` — ${farmLocation}` : ''}</p>
+          {showDateFilter && <p>Period: {formatDate(startDate)} — {formatDate(endDate)}</p>}
           <p>{dateTimeStr}</p>
         </div>
 
@@ -180,10 +190,10 @@ export default function ReportsPage() {
               ))}
             </div>
             <table>
-              <thead><tr><th>Tag</th><th>Breed</th><th>Category</th><th>Sex</th><th>Status</th></tr></thead>
+              <thead><tr><th>Tag</th><th>Breed</th><th>Category</th><th>Sex</th><th>Status</th><th>Pen</th></tr></thead>
               <tbody>
                 {(data.animals || []).map((a) => (
-                  <tr key={a._id}><td>{a.tag}</td><td>{a.breed}</td><td>{a.category}</td><td>{a.sex}</td><td>{a.status}</td></tr>
+                  <tr key={a._id}><td>{a.tag}</td><td>{a.breed}</td><td>{a.category}</td><td>{a.sex}</td><td>{a.status}</td><td>{a.pen || '—'}</td></tr>
                 ))}
               </tbody>
             </table>
@@ -193,32 +203,49 @@ export default function ReportsPage() {
         {activeTab === 'production' && (
           <>
             <div className="print-summary">
-              <div className="print-summary-card"><div className="label">Total Milk (30d)</div><div className="value">{data.totalMilk?.toFixed(1) || '0'} L</div></div>
-              <div className="print-summary-card"><div className="label">Total Eggs (30d)</div><div className="value">{data.totalEggs || '0'}</div></div>
+              <div className="print-summary-card"><div className="label">Total Milk</div><div className="value">{data.totalMilk?.toFixed(1) || '0'} L</div></div>
+              <div className="print-summary-card"><div className="label">Total Eggs</div><div className="value">{data.totalEggs || '0'}</div></div>
+              <div className="print-summary-card"><div className="label">Total Value</div><div className="value">{formatCurrency(data.totalValue || 0)}</div></div>
               <div className="print-summary-card"><div className="label">Total Records</div><div className="value">{data.records?.length || 0}</div></div>
             </div>
             <table>
-              <thead><tr><th>Date</th><th>Animal</th><th>Type</th><th>Quantity</th><th>Session</th></tr></thead>
+              <thead><tr><th>Date</th><th>Animal</th><th>Type</th><th>Quantity</th><th>Value</th></tr></thead>
               <tbody>
                 {(data.records || []).slice(0, 100).map((r) => (
-                  <tr key={r._id}><td>{formatDate(r.date)}</td><td>{r.animalId?.tag || '—'}</td><td className="capitalize">{r.type}</td><td>{r.quantity} {r.unit}</td><td className="capitalize">{r.session || 'single'}</td></tr>
+                  <tr key={r._id}>
+                    <td>{formatDate(r.date)}</td>
+                    <td>{r.animalId?.tag || '—'}</td>
+                    <td className="capitalize">{r.type}</td>
+                    <td>{r.quantity} {r.unit}</td>
+                    <td>{r.value > 0 ? formatCurrency(r.value) : '—'}</td>
+                  </tr>
                 ))}
                 {(data.records || []).length === 0 && <tr><td colSpan="5" className="text-center">No production records found</td></tr>}
               </tbody>
             </table>
-            {Object.keys(data.byDay || {}).length > 0 && (
-              <>
-                <h3 style={{ marginTop: '24px', marginBottom: '12px', fontSize: '14px', fontWeight: 600 }}>Daily Breakdown</h3>
-                <table>
-                  <thead><tr><th>Day</th><th>Milk (L)</th><th>Eggs</th></tr></thead>
-                  <tbody>
-                    {Object.entries(data.byDay).reverse().map(([day, d]) => (
-                      <tr key={day}><td>{day}</td><td>{d.milk?.toFixed(1) || '0'}</td><td>{d.eggs || '0'}</td></tr>
-                    ))}
-                  </tbody>
-                </table>
-              </>
-            )}
+          </>
+        )}
+
+        {activeTab === 'crops' && (
+          <>
+            <div className="print-summary">
+              <div className="print-summary-card"><div className="label">Total Crops</div><div className="value">{data.crops?.length || 0}</div></div>
+              <div className="print-summary-card"><div className="label">Growing</div><div className="value">{data.growing?.length || 0}</div></div>
+              <div className="print-summary-card"><div className="label">Harvested</div><div className="value">{data.harvested?.length || 0}</div></div>
+            </div>
+            <table>
+              <thead><tr><th>Crop</th><th>Variety</th><th>Planted</th><th>Harvested</th><th>Yield</th><th>Status</th></tr></thead>
+              <tbody>
+                {(data.crops || []).map((c) => (
+                  <tr key={c._id}>
+                    <td>{c.cropType}</td><td>{c.variety || '—'}</td><td>{formatDate(c.plantingDate)}</td>
+                    <td>{c.actualHarvestDate ? formatDate(c.actualHarvestDate) : '—'}</td>
+                    <td>{c.yield ? `${c.yield.quantity} ${c.yield.unit}` : '—'}</td>
+                    <td>{c.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </>
         )}
 
@@ -230,10 +257,14 @@ export default function ReportsPage() {
               <div className="print-summary-card"><div className="label">Balance</div><div className="value">{formatCurrency(data.summary?.balance || 0)}</div></div>
             </div>
             <table>
-              <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th></tr></thead>
+              <thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Description</th><th>Amount</th></tr></thead>
               <tbody>
                 {(data.records || []).map((r) => (
-                  <tr key={r._id}><td>{formatDate(r.date)}</td><td>{r.category}</td><td>{r.description || '—'}</td><td className={r.type === 'income' ? 'text-green-600' : 'text-red-600'}>{r.type === 'income' ? '+' : '-'}{formatCurrency(r.amount)}</td></tr>
+                  <tr key={r._id}>
+                    <td>{formatDate(r.date)}</td><td><Badge variant={r.type === 'income' ? 'success' : 'danger'}>{r.type}</Badge></td>
+                    <td>{r.category}</td><td>{r.description || '—'}</td>
+                    <td className={r.type === 'income' ? 'text-green-600' : 'text-red-600'}>{r.type === 'income' ? '+' : '-'}{formatCurrency(r.amount)}</td>
+                  </tr>
                 ))}
               </tbody>
             </table>

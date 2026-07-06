@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import { AuthContext } from '../hooks/useAuth';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { getProfile } from '../api/authApi';
+
+const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -29,10 +30,16 @@ export function AuthProvider({ children }) {
   };
 
   const loginUser = (data) => {
-    localStorage.setItem('farmwise_token', data.token);
-    localStorage.setItem('farmwise_user', JSON.stringify(data.user));
-    setUser(data.user);
-    setFarm(data.farm);
+    if (data.token) {
+      localStorage.setItem('farmwise_token', data.token);
+    }
+    if (data.user) {
+      localStorage.setItem('farmwise_user', JSON.stringify(data.user));
+      setUser(data.user);
+    }
+    if (data.farm) {
+      setFarm(data.farm);
+    }
   };
 
   const logout = () => {
@@ -48,3 +55,11 @@ export function AuthProvider({ children }) {
     </AuthContext.Provider>
   );
 }
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
+};

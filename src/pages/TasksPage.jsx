@@ -4,10 +4,11 @@ import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input';
-import { getTasks, createTask, updateTask } from '../api/taskApi';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { getTasks, createTask, updateTask, deleteTask } from '../api/taskApi';
 import { TASK_CATEGORIES } from '../utils/constants';
 import { formatDate } from '../utils/formatters';
-import { Plus, CheckCircle, Circle } from 'lucide-react';
+import { Plus, CheckCircle, Circle, Pencil, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 
 const priorityBadge = { low: 'info', medium: 'warning', high: 'warning', critical: 'danger' };
@@ -16,24 +17,36 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [showDelete, setShowDelete] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({ title: '', category: 'other', priority: 'medium', dueDate: '', description: '' });
 
   useEffect(() => { fetchTasks(); }, []);
 
   const fetchTasks = async () => {
-    try {
-      const res = await getTasks({ limit: 100 });
-      setTasks(res.data.data);
-    } catch {} finally { setLoading(false); }
+    try { const res = await getTasks({ limit: 100 }); setTasks(res.data.data || []); } catch {} finally { setLoading(false); }
   };
 
-  const handleAdd = async (e) => {
+  const openEdit = (task) => {
+    setEditingTask(task);
+    setForm({
+      title: task.title || '',
+      category: task.category || 'other',
+      priority: task.priority || 'medium',
+      dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
+      description: task.description || '',
+    });
+    setShowForm(true);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await createTask(form);
-      setShowForm(false);
+      if (editingTask) { await updateTask(editingTask._id, form); }
+      else { await createTask(form); }
+      setShowForm(false); setEditingTask(null);
       setForm({ title: '', category: 'other', priority: 'medium', dueDate: '', description: '' });
       fetchTasks();
     } catch {} finally { setSubmitting(false); }
@@ -45,9 +58,24 @@ export default function TasksPage() {
     fetchTasks();
   };
 
+  const handleDelete = async () => {
+    if (!showDelete) return;
+    setSubmitting(true);
+    try { await deleteTask(showDelete._id); setShowDelete(null); fetchTasks(); } catch {} finally { setSubmitting(false); }
+  };
+
   return (
     <div>
-      <PageHeader title="Tasks" description="Manage farm activities" action={<Button onClick={() => setShowForm(true)}><Plus className="h-4 w-4" />Add Task</Button>} />
+      <PageHeader
+        title="Tasks"
+        description="Manage farm activities"
+        action={
+          <Button onClick={() => { setEditingTask(null); setForm({ title: '', category: 'other', priority: 'medium', dueDate: '', description: '' }); setShowForm(true); }}>
+            <Plus className="h-4 w-4" /> Add Task
+          </Button>
+        }
+      />
+
       <div className="space-y-2">
         {tasks.map((task) => (
           <div key={task._id} className={clsx('flex items-center gap-3 p-3 rounded-lg border', task.status === 'completed' ? 'bg-gray-50 dark:bg-gray-800/30 border-gray-100 dark:border-gray-800' : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800')}>
@@ -60,19 +88,21 @@ export default function TasksPage() {
             </div>
             <Badge variant={priorityBadge[task.priority]}>{task.priority}</Badge>
             <span className="text-xs text-gray-400">{task.dueDate ? formatDate(task.dueDate) : ''}</span>
+            <Button variant="ghost" size="sm" onClick={() => openEdit(task)}><Pencil className="h-4 w-4 text-gray-400" /></Button>
+            <Button variant="ghost" size="sm" onClick={() => setShowDelete(task)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
           </div>
         ))}
       </div>
       {!loading && tasks.length === 0 && <p className="text-center py-12 text-gray-400">No tasks yet</p>}
 
-      <Modal open={showForm} onClose={() => setShowForm(false)} title="Add Task">
-        <form onSubmit={handleAdd} className="space-y-4">
+      <Modal open={showForm} onClose={() => { setShowForm(false); setEditingTask(null); }} title={editingTask ? 'Edit Task' : 'Add Task'}>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <Input label="Title *" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
               <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="input-field">
-                {TASK_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                {TASK_CATEGORIES.map((c) => (<option key={c.value} value={c.value}>{c.label}</option>))}
               </select>
             </div>
             <div>
@@ -85,11 +115,13 @@ export default function TasksPage() {
           </div>
           <Input label="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
-            <Button variant="secondary" onClick={() => setShowForm(false)}>Cancel</Button>
-            <Button type="submit" loading={submitting}>Add Task</Button>
+            <Button variant="secondary" onClick={() => { setShowForm(false); setEditingTask(null); }}>Cancel</Button>
+            <Button type="submit" loading={submitting}>{editingTask ? 'Update' : 'Add'} Task</Button>
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog open={!!showDelete} onClose={() => setShowDelete(null)} onConfirm={handleDelete} title="Delete Task" message="Permanently delete this task?" confirmLabel="Delete" loading={submitting} />
     </div>
   );
 }

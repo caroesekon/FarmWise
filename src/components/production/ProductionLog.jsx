@@ -1,5 +1,6 @@
-import { formatDate } from '../../utils/formatters';
-import { Milk, Egg, TrendingUp, Layers } from 'lucide-react';
+import { formatDate, formatCurrency } from '../../utils/formatters';
+import { Milk, Egg, TrendingUp, Layers, Pencil, Trash2 } from 'lucide-react';
+import Button from '../ui/Button';
 
 const typeConfig = {
   milk: { icon: Milk, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-950/30' },
@@ -8,17 +9,13 @@ const typeConfig = {
 };
 
 function getAnimalTag(record) {
-  if (record.animalId && typeof record.animalId === 'object') {
-    return record.animalId.tag || '—';
-  }
-  if (record.animal && typeof record.animal === 'object') {
-    return record.animal.tag || '—';
-  }
-  return record.animalId || record.animal || '—';
+  if (record.animalId && typeof record.animalId === 'object') return record.animalId.tag || '—';
+  if (record.animal && typeof record.animal === 'object') return record.animal.tag || '—';
+  return record.animalId || '—';
 }
 
-export default function ProductionLog({ records, batchSummary, viewMode = 'single' }) {
-  const batchRecords = records.filter((r) => r.notes && r.notes.startsWith('Batch:'));
+export default function ProductionLog({ records, batchSummary, viewMode = 'single', onEdit, onDelete }) {
+  const batchRecords = records.filter((r) => r.notes?.startsWith('Batch:'));
   const individualRecords = records.filter((r) => !r.notes || !r.notes.startsWith('Batch:'));
 
   if (viewMode === 'batch') {
@@ -30,7 +27,6 @@ export default function ProductionLog({ records, batchSummary, viewMode = 'singl
         </div>
       );
     }
-
     return (
       <div className="space-y-3">
         {batchSummary.map((b, i) => (
@@ -38,12 +34,8 @@ export default function ProductionLog({ records, batchSummary, viewMode = 'singl
             <div className="flex items-center gap-3 mb-2">
               <Layers className="h-5 w-5 text-purple-500" />
               <div>
-                <p className="font-medium text-gray-900 dark:text-white">
-                  {b.batchId?.split('-').slice(0, -2).join('-') || b.batchId}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {b.count} animals · {b.totalQuantity} total · {formatDate(b.date)}
-                </p>
+                <p className="font-medium text-gray-900 dark:text-white">{b.batchId?.split('-').slice(0, -2).join('-') || b.batchId}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{b.count} animals · {b.totalQuantity} total{b.totalValue ? ` · ${formatCurrency(b.totalValue)}` : ''} · {formatDate(b.date)}</p>
               </div>
             </div>
           </div>
@@ -82,19 +74,22 @@ export default function ProductionLog({ records, batchSummary, viewMode = 'singl
           const config = typeConfig[record.type] || typeConfig.weight;
           const Icon = config.icon;
           const animalTag = getAnimalTag(record);
-
           return (
-            <div key={record._id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+            <div key={record._id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
               <div className={`p-2 rounded-lg ${config.bg}`}>
                 <Icon className={`h-4 w-4 ${config.color}`} />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  {animalTag} — {record.quantity} {record.unit}
-                </p>
-                <p className="text-xs text-gray-400 capitalize">{record.type} · {record.session || 'single'}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">{animalTag} — {record.quantity} {record.unit}</p>
+                <p className="text-xs text-gray-400 capitalize">{record.type} · {record.session || 'single'}{record.value > 0 ? ` · ${formatCurrency(record.value)}` : ''}</p>
               </div>
               <span className="text-xs text-gray-400">{formatDate(record.date)}</span>
+              {onEdit && (
+                <Button variant="ghost" size="sm" onClick={() => onEdit(record)}><Pencil className="h-4 w-4 text-gray-400" /></Button>
+              )}
+              {onDelete && (
+                <Button variant="ghost" size="sm" onClick={() => onDelete(record)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+              )}
             </div>
           );
         })}

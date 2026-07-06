@@ -3,6 +3,8 @@ import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import { getBatches } from '../../api/animalApi';
+import { getPrices } from '../../api/farmApi';
+import { formatCurrency } from '../../utils/formatters';
 
 const types = [
   { value: 'milk', label: 'Milk (L)' },
@@ -20,22 +22,20 @@ const sessions = [
 export default function ProductionForm({ open, onClose, onSubmit, loading, animals }) {
   const [useBatch, setUseBatch] = useState(false);
   const [batches, setBatches] = useState([]);
+  const [prices, setPrices] = useState([]);
   const [form, setForm] = useState({
-    animalId: '',
-    batchId: '',
-    type: 'milk',
-    quantity: '',
-    unit: 'L',
-    date: new Date().toISOString().split('T')[0],
-    session: 'single',
-    notes: '',
+    animalId: '', batchId: '', type: 'milk', quantity: '', unit: 'L',
+    date: new Date().toISOString().split('T')[0], session: 'single', notes: '',
   });
+
+  const individualAnimals = animals?.filter((a) => !a.batchId) || [];
 
   useEffect(() => {
     if (open) {
       fetchBatches();
-      if (animals?.length > 0 && !form.animalId) {
-        setForm((prev) => ({ ...prev, animalId: animals[0]._id }));
+      fetchPrices();
+      if (individualAnimals.length > 0 && !form.animalId) {
+        setForm((prev) => ({ ...prev, animalId: individualAnimals[0]._id }));
       }
     }
   }, [open]);
@@ -48,7 +48,14 @@ export default function ProductionForm({ open, onClose, onSubmit, loading, anima
   const fetchBatches = async () => {
     try {
       const res = await getBatches();
-      setBatches(res.data.data);
+      setBatches(res.data.data || []);
+    } catch {}
+  };
+
+  const fetchPrices = async () => {
+    try {
+      const res = await getPrices();
+      setPrices(res.data.data || []);
     } catch {}
   };
 
@@ -59,13 +66,21 @@ export default function ProductionForm({ open, onClose, onSubmit, loading, anima
   const handleSubmit = (e) => {
     e.preventDefault();
     const data = { ...form, quantity: Number(form.quantity) };
-    if (useBatch) {
-      delete data.animalId;
-    } else {
-      delete data.batchId;
-    }
+    if (useBatch) delete data.animalId;
+    else delete data.batchId;
     onSubmit(data);
   };
+
+  const unitPrice = prices.find((p) => {
+    const name = (p.name || '').toLowerCase();
+    const priceUnit = (p.unit || '').toLowerCase();
+    const formUnit = (form.unit || '').toLowerCase();
+    if (form.type === 'milk') return name.includes('milk');
+    if (form.type === 'eggs') return name.includes('egg') && priceUnit === formUnit;
+    return false;
+  });
+
+  const estimatedValue = (unitPrice?.price || 0) * (Number(form.quantity) || 0);
 
   return (
     <Modal open={open} onClose={onClose} title="Record Production" size="md">
@@ -81,7 +96,7 @@ export default function ProductionForm({ open, onClose, onSubmit, loading, anima
             <select name="batchId" value={form.batchId} onChange={handleChange} className="input-field" required>
               <option value="">Select batch</option>
               {batches.map((b) => (
-                <option key={b._id} value={b._id}>{b._id.split('-').slice(0, -2).join('-')} — {b.breed} ({b.count} animals)</option>
+                <option key={b._id} value={b._id}>{b._id?.split('-').slice(0, -2).join('-')} — {b.breed} ({b.count} animals)</option>
               ))}
             </select>
           </div>
@@ -90,10 +105,13 @@ export default function ProductionForm({ open, onClose, onSubmit, loading, anima
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Animal *</label>
             <select name="animalId" value={form.animalId} onChange={handleChange} className="input-field" required>
               <option value="">Select animal</option>
-              {animals?.map((a) => (
+              {individualAnimals.map((a) => (
                 <option key={a._id} value={a._id}>{a.tag} — {a.breed}</option>
               ))}
             </select>
+            {individualAnimals.length === 0 && (
+              <p className="text-xs text-gray-400 mt-1">No individual animals. All animals are in batches — use Batch mode.</p>
+            )}
           </div>
         )}
 
@@ -107,6 +125,19 @@ export default function ProductionForm({ open, onClose, onSubmit, loading, anima
           <Input label={`Quantity (${form.unit}) *`} name="quantity" type="number" step="0.1" value={form.quantity} onChange={handleChange} required />
         </div>
 
+        {unitPrice && form.quantity && (
+          <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-green-700 dark:text-green-300">
+                {unitPrice.name}: KES {unitPrice.price}/{unitPrice.unit}
+              </span>
+              <span className="text-sm font-semibold text-green-700 dark:text-green-300">
+                Estimated: {formatCurrency(estimatedValue)}
+              </span>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4">
           <Input label="Date" name="date" type="date" value={form.date} onChange={handleChange} />
           <div>
@@ -118,12 +149,6 @@ export default function ProductionForm({ open, onClose, onSubmit, loading, anima
         </div>
 
         <Input label="Notes" name="notes" value={form.notes} onChange={handleChange} />
-
-        {useBatch && form.quantity && form.batchId && (
-          <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-950/30 text-sm text-purple-700 dark:text-purple-300">
-            Recording {form.quantity} {form.unit} across {batches.find(b => b._id === form.batchId)?.count || '?'} animals
-          </div>
-        )}
 
         <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>

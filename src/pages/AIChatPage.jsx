@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
 import { chat as chatApi } from '../api/aiApi';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../context/AuthContext';
 import {
   Send,
   Bot,

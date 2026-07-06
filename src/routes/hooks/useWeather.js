@@ -9,8 +9,8 @@ export function useWeather() {
   const fetchWeather = async () => {
     try {
       const res = await getWeather();
-      setWeather(res.data.data.current);
-      setExtremeAlerts(res.data.data.extremeAlerts || []);
+      setWeather(res.data.data.forecast);
+      setExtremeAlerts(res.data.data.extremeAlerts);
     } catch {
       //
     } finally {

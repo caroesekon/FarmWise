@@ -1,20 +1,6 @@
-const CACHE_NAME = 'farmwise-v1';
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/logo.svg',
-  '/icon-192.png',
-  '/icon-512.png',
-  '/favicon.ico',
-];
+const CACHE_NAME = 'farmwise-v2';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
-    })
-  );
   self.skipWaiting();
 });
 
@@ -30,27 +16,33 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
+  const url = event.request.url;
 
-  if (event.request.url.includes('/api/')) {
-    event.respondWith(fetch(event.request).catch(() => {
-      return new Response(JSON.stringify({ success: false, message: 'You are offline' }), {
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }));
+  if (
+    url.startsWith('chrome-extension://') ||
+    url.includes('/api/') ||
+    url.includes('__vite') ||
+    url.includes('hmr') ||
+    url.includes('node_modules') ||
+    url.includes('src/')
+  ) {
     return;
   }
+
+  if (event.request.method !== 'GET') return;
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
       return cached || fetch(event.request).then((response) => {
-        if (response.ok) {
+        if (response.ok && response.type === 'basic') {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, clone);
           });
         }
         return response;
+      }).catch(() => {
+        return cached || new Response('You are offline', { status: 503 });
       });
     })
   );

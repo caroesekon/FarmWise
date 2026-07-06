@@ -3,27 +3,32 @@ import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../context/AuthContext';
 import { updateProfile, changePassword as changePasswordApi } from '../api/authApi';
 import { getFarm, updateFarm } from '../api/farmApi';
-import { User, Lock, Bell, Globe, MapPin, Wheat } from 'lucide-react';
+import { User, Lock, Bell, Globe, Wheat } from 'lucide-react';
 
 export default function SettingsPage() {
   const { user, loginUser } = useAuth();
+  const role = user?.role || 'worker';
+
+  const tabs = [
+    { key: 'profile', label: 'Profile', icon: User },
+    { key: 'password', label: 'Password', icon: Lock },
+    ...(role === 'farmAdmin' || role === 'manager' ? [
+      { key: 'farm', label: 'Farm', icon: Wheat },
+      { key: 'notifications', label: 'Notifications', icon: Bell },
+    ] : []),
+  ];
+
   const [activeTab, setActiveTab] = useState('profile');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [farmData, setFarmData] = useState(null);
 
-  const [profile, setProfile] = useState({
-    name: user?.name || '',
-  });
+  const [profile, setProfile] = useState({ name: user?.name || '' });
 
-  const [passwords, setPasswords] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-  });
+  const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
 
   const [prefs, setPrefs] = useState({
     dailyBriefing: user?.preferences?.dailyBriefing ?? true,
@@ -32,16 +37,10 @@ export default function SettingsPage() {
     language: user?.preferences?.language || 'en',
   });
 
-  const [farmForm, setFarmForm] = useState({
-    name: '',
-    county: '',
-    subCounty: '',
-    size: '',
-    sizeUnit: 'acres',
-  });
+  const [farmForm, setFarmForm] = useState({ name: '', county: '', subCounty: '', size: '', sizeUnit: 'acres' });
 
   useEffect(() => {
-    fetchFarm();
+    if (role === 'farmAdmin' || role === 'manager') fetchFarm();
   }, []);
 
   const fetchFarm = async () => {
@@ -58,13 +57,6 @@ export default function SettingsPage() {
     } catch {}
   };
 
-  const tabs = [
-    { key: 'profile', label: 'Profile', icon: User },
-    { key: 'farm', label: 'Farm', icon: Wheat },
-    { key: 'password', label: 'Password', icon: Lock },
-    { key: 'notifications', label: 'Notifications', icon: Bell },
-  ];
-
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -72,7 +64,7 @@ export default function SettingsPage() {
     try {
       await updateProfile({ name: profile.name, preferences: prefs });
       loginUser({ user: { ...user, name: profile.name, preferences: prefs } });
-      setMessage('Profile updated successfully');
+      setMessage('Profile updated');
     } catch {
       setMessage('Failed to update profile');
     } finally {
@@ -80,53 +72,44 @@ export default function SettingsPage() {
     }
   };
 
-const handleFarmUpdate = async (e) => {
-  e.preventDefault();
-  setSaving(true);
-  setMessage('');
-  try {
-    await updateFarm({
-      name: farmForm.name,
-      location: {
-        county: farmForm.county,
-        subCounty: farmForm.subCounty,
-      },
-      size: farmForm.size ? Number(farmForm.size) : undefined,
-      sizeUnit: farmForm.sizeUnit,
-    });
-    setMessage('Farm updated successfully');
-    fetchFarm();
-  } catch {
-    setMessage('Failed to update farm');
-  } finally {
-    setSaving(false);
-  }
-};
+  const handleFarmUpdate = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setMessage('');
+    try {
+      await updateFarm({
+        name: farmForm.name,
+        location: { county: farmForm.county, subCounty: farmForm.subCounty },
+        size: farmForm.size ? Number(farmForm.size) : undefined,
+        sizeUnit: farmForm.sizeUnit,
+      });
+      setMessage('Farm updated');
+      fetchFarm();
+    } catch {
+      setMessage('Failed to update farm');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
     setSaving(true);
     setMessage('');
-
     if (passwords.newPassword !== passwords.confirmPassword) {
       setMessage('Passwords do not match');
       setSaving(false);
       return;
     }
-
     if (passwords.newPassword.length < 8) {
       setMessage('Password must be at least 8 characters');
       setSaving(false);
       return;
     }
-
     try {
-      await changePasswordApi({
-        currentPassword: passwords.currentPassword,
-        newPassword: passwords.newPassword,
-      });
+      await changePasswordApi({ currentPassword: passwords.currentPassword, newPassword: passwords.newPassword });
       setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      setMessage('Password changed successfully');
+      setMessage('Password changed');
     } catch (err) {
       setMessage(err.response?.data?.message || 'Failed to change password');
     } finally {
@@ -134,13 +117,9 @@ const handleFarmUpdate = async (e) => {
     }
   };
 
-  const handleFarmChange = (e) => {
-    setFarmForm({ ...farmForm, [e.target.name]: e.target.value });
-  };
-
   return (
     <div>
-      <PageHeader title="Settings" description="Manage your account, farm, and preferences" />
+      <PageHeader title="Settings" description="Manage your account and preferences" />
 
       <div className="flex gap-6">
         <div className="w-56 space-y-1">
@@ -154,8 +133,7 @@ const handleFarmUpdate = async (e) => {
                   : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
               }`}
             >
-              <Icon className="h-4 w-4" />
-              {label}
+              <Icon className="h-4 w-4" /> {label}
             </button>
           ))}
         </div>
@@ -163,30 +141,21 @@ const handleFarmUpdate = async (e) => {
         <div className="flex-1 max-w-2xl">
           {activeTab === 'profile' && (
             <Card>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Profile Information</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Profile</h3>
               <form onSubmit={handleProfileUpdate} className="space-y-4">
                 <Input label="Full Name" value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
-                <Input label="Email" value={user?.email || ''} disabled />
-                <Input label="Phone" value={user?.phone || ''} disabled />
-                <Input label="Role" value={user?.role || ''} disabled />
-
+                <Input label="Email" value={user?.email || '—'} disabled />
+                <Input label="Phone" value={user?.phone || '—'} disabled />
+                <Input label="Role" value={user?.role || '—'} disabled />
                 <div className="flex items-center gap-2 pt-2">
                   <Globe className="h-4 w-4 text-gray-400" />
-                  <select
-                    value={prefs.language}
-                    onChange={(e) => setPrefs({ ...prefs, language: e.target.value })}
-                    className="input-field w-40"
-                  >
+                  <select value={prefs.language} onChange={(e) => setPrefs({ ...prefs, language: e.target.value })} className="input-field w-40">
                     <option value="en">English</option>
                     <option value="sw">Swahili</option>
                   </select>
                 </div>
-
-                {message && (
-                  <p className={`text-sm ${message.includes('success') ? 'text-green-600' : 'text-red-500'}`}>{message}</p>
-                )}
-
-                <Button type="submit" loading={saving}>Save Changes</Button>
+                {message && <p className={`text-sm ${message.includes('Failed') ? 'text-red-500' : 'text-green-600'}`}>{message}</p>}
+                <Button type="submit" loading={saving}>Save</Button>
               </form>
             </Card>
           )}
@@ -195,28 +164,22 @@ const handleFarmUpdate = async (e) => {
             <Card>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Farm Settings</h3>
               <form onSubmit={handleFarmUpdate} className="space-y-4">
-                <Input label="Farm Name" name="name" value={farmForm.name} onChange={handleFarmChange} />
-
+                <Input label="Farm Name" value={farmForm.name} onChange={(e) => setFarmForm({ ...farmForm, name: e.target.value })} />
                 <div className="grid grid-cols-2 gap-4">
-                  <Input label="County" name="county" value={farmForm.county} onChange={handleFarmChange} />
-                  <Input label="Sub-County" name="subCounty" value={farmForm.subCounty} onChange={handleFarmChange} />
+                  <Input label="County" value={farmForm.county} onChange={(e) => setFarmForm({ ...farmForm, county: e.target.value })} />
+                  <Input label="Sub-County" value={farmForm.subCounty} onChange={(e) => setFarmForm({ ...farmForm, subCounty: e.target.value })} />
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
-                  <Input label="Farm Size" name="size" type="number" value={farmForm.size} onChange={handleFarmChange} />
+                  <Input label="Farm Size" type="number" value={farmForm.size} onChange={(e) => setFarmForm({ ...farmForm, size: e.target.value })} />
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Unit</label>
-                    <select name="sizeUnit" value={farmForm.sizeUnit} onChange={handleFarmChange} className="input-field">
+                    <select value={farmForm.sizeUnit} onChange={(e) => setFarmForm({ ...farmForm, sizeUnit: e.target.value })} className="input-field">
                       <option value="acres">Acres</option>
                       <option value="hectares">Hectares</option>
                     </select>
                   </div>
                 </div>
-
-                {message && (
-                  <p className={`text-sm ${message.includes('success') ? 'text-green-600' : 'text-red-500'}`}>{message}</p>
-                )}
-
+                {message && <p className={`text-sm ${message.includes('Failed') ? 'text-red-500' : 'text-green-600'}`}>{message}</p>}
                 <Button type="submit" loading={saving}>Update Farm</Button>
               </form>
             </Card>
@@ -228,12 +191,8 @@ const handleFarmUpdate = async (e) => {
               <form onSubmit={handlePasswordChange} className="space-y-4">
                 <Input label="Current Password" type="password" value={passwords.currentPassword} onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })} />
                 <Input label="New Password" type="password" value={passwords.newPassword} onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })} placeholder="Min. 8 characters" />
-                <Input label="Confirm New Password" type="password" value={passwords.confirmPassword} onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })} />
-
-                {message && (
-                  <p className={`text-sm ${message.includes('success') ? 'text-green-600' : 'text-red-500'}`}>{message}</p>
-                )}
-
+                <Input label="Confirm Password" type="password" value={passwords.confirmPassword} onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })} />
+                {message && <p className={`text-sm ${message.includes('Failed') ? 'text-red-500' : 'text-green-600'}`}>{message}</p>}
                 <Button type="submit" loading={saving}>Update Password</Button>
               </form>
             </Card>
@@ -246,31 +205,25 @@ const handleFarmUpdate = async (e) => {
                 <label className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-800">
                   <div>
                     <p className="font-medium text-gray-900 dark:text-white">Daily Briefing</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Receive a daily farm summary at 7 AM EAT</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Receive daily farm summary at 6 AM EAT</p>
                   </div>
-                  <input type="checkbox" checked={prefs.dailyBriefing} onChange={(e) => setPrefs({ ...prefs, dailyBriefing: e.target.checked })} className="toggle" />
+                  <input type="checkbox" checked={prefs.dailyBriefing} onChange={(e) => setPrefs({ ...prefs, dailyBriefing: e.target.checked })} />
                 </label>
-
                 <label className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-800">
                   <div>
                     <p className="font-medium text-gray-900 dark:text-white">Email Alerts</p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">Get critical alerts via email</p>
                   </div>
-                  <input type="checkbox" checked={prefs.emailAlerts} onChange={(e) => setPrefs({ ...prefs, emailAlerts: e.target.checked })} className="toggle" />
+                  <input type="checkbox" checked={prefs.emailAlerts} onChange={(e) => setPrefs({ ...prefs, emailAlerts: e.target.checked })} />
                 </label>
-
                 <label className="flex items-center justify-between py-3">
                   <div>
                     <p className="font-medium text-gray-900 dark:text-white">SMS Alerts</p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">Get critical alerts via SMS</p>
                   </div>
-                  <input type="checkbox" checked={prefs.smsAlerts} onChange={(e) => setPrefs({ ...prefs, smsAlerts: e.target.checked })} className="toggle" />
+                  <input type="checkbox" checked={prefs.smsAlerts} onChange={(e) => setPrefs({ ...prefs, smsAlerts: e.target.checked })} />
                 </label>
-
-                {message && (
-                  <p className={`text-sm ${message.includes('success') ? 'text-green-600' : 'text-red-500'}`}>{message}</p>
-                )}
-
+                {message && <p className={`text-sm ${message.includes('Failed') ? 'text-red-500' : 'text-green-600'}`}>{message}</p>}
                 <Button onClick={handleProfileUpdate} loading={saving}>Save Preferences</Button>
               </div>
             </Card>

@@ -7,7 +7,7 @@ import AlertList from '../components/dashboard/AlertList';
 import ProductionChart from '../components/dashboard/ProductionChart';
 import UpcomingReminders from '../components/dashboard/UpcomingReminders';
 import QuickActions from '../components/dashboard/QuickActions';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../context/AuthContext';
 import { useAlerts } from '../hooks/useAlerts';
 import { useWeather } from '../hooks/useWeather';
 import { getBriefing } from '../api/briefingApi';
