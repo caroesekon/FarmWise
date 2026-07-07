@@ -6,7 +6,8 @@ import Input from '../components/ui/Input';
 import { useAuth } from '../context/AuthContext';
 import { updateProfile, changePassword as changePasswordApi } from '../api/authApi';
 import { getFarm, updateFarm } from '../api/farmApi';
-import { User, Lock, Bell, Globe, Wheat } from 'lucide-react';
+import { User, Lock, Bell, Globe, Wheat, Download, Headphones } from 'lucide-react';
+import { API_URL } from '../api/axios';
 
 export default function SettingsPage() {
   const { user, loginUser } = useAuth();
@@ -19,28 +20,31 @@ export default function SettingsPage() {
       { key: 'farm', label: 'Farm', icon: Wheat },
       { key: 'notifications', label: 'Notifications', icon: Bell },
     ] : []),
+    { key: 'downloads', label: 'Downloads', icon: Download },
+    { key: 'support', label: 'Support', icon: Headphones },
   ];
 
   const [activeTab, setActiveTab] = useState('profile');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [farmData, setFarmData] = useState(null);
+  const [downloads, setDownloads] = useState({});
+  const [supportInfo, setSupportInfo] = useState({ phone: '', email: '' });
 
   const [profile, setProfile] = useState({ name: user?.name || '' });
-
   const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
-
   const [prefs, setPrefs] = useState({
     dailyBriefing: user?.preferences?.dailyBriefing ?? true,
     emailAlerts: user?.preferences?.emailAlerts ?? true,
     smsAlerts: user?.preferences?.smsAlerts ?? false,
     language: user?.preferences?.language || 'en',
   });
-
   const [farmForm, setFarmForm] = useState({ name: '', county: '', subCounty: '', size: '', sizeUnit: 'acres' });
 
   useEffect(() => {
     if (role === 'farmAdmin' || role === 'manager') fetchFarm();
+    fetchDownloads();
+    fetchSupport();
   }, []);
 
   const fetchFarm = async () => {
@@ -54,6 +58,22 @@ export default function SettingsPage() {
         size: res.data.data.size || '',
         sizeUnit: res.data.data.sizeUnit || 'acres',
       });
+    } catch {}
+  };
+
+  const fetchDownloads = async () => {
+    try {
+      const res = await fetch(`${API_URL}/downloads`);
+      const data = await res.json();
+      if (data.success) setDownloads(data.data || {});
+    } catch {}
+  };
+
+  const fetchSupport = async () => {
+    try {
+      const res = await fetch(`${API_URL}/support`);
+      const data = await res.json();
+      if (data.success) setSupportInfo(data.data || { phone: '', email: '' });
     } catch {}
   };
 
@@ -226,6 +246,120 @@ export default function SettingsPage() {
                 {message && <p className={`text-sm ${message.includes('Failed') ? 'text-red-500' : 'text-green-600'}`}>{message}</p>}
                 <Button onClick={handleProfileUpdate} loading={saving}>Save Preferences</Button>
               </div>
+            </Card>
+          )}
+
+          {activeTab === 'downloads' && (
+            <Card>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Download FarmWise</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Download FarmWise for your preferred platform.</p>
+
+              {downloads.windows ? (
+                <a href={downloads.windows.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors mb-3">
+                  <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-950 flex items-center justify-center text-2xl">🪟</div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900 dark:text-white">FarmWise for Windows</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Version {downloads.windows.version || 'Latest'}</p>
+                  </div>
+                  <Button variant="outline" size="sm">Download</Button>
+                </a>
+              ) : (
+                <div className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 mb-3 opacity-50">
+                  <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-2xl">🪟</div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900 dark:text-white">FarmWise for Windows</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Not available yet</p>
+                  </div>
+                </div>
+              )}
+
+              {downloads.android ? (
+                <a href={downloads.android.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors mb-3">
+                  <div className="w-12 h-12 rounded-xl bg-green-100 dark:bg-green-950 flex items-center justify-center text-2xl">🤖</div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900 dark:text-white">FarmWise for Android</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Version {downloads.android.version || 'Latest'}</p>
+                  </div>
+                  <Button variant="outline" size="sm">Download</Button>
+                </a>
+              ) : (
+                <div className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 mb-3 opacity-50">
+                  <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-2xl">🤖</div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900 dark:text-white">FarmWise for Android</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Not available yet</p>
+                  </div>
+                </div>
+              )}
+
+              {!downloads.windows && !downloads.android && (
+                <div className="text-center py-8 text-gray-400">
+                  <Download className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm">No downloads available yet. Check back soon.</p>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {activeTab === 'support' && (
+            <Card>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Support</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                Need help? Reach out to our support team.
+              </p>
+
+              {supportInfo.phone ? (
+                <a href={`tel:${supportInfo.phone}`} className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors mb-3">
+                  <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-950 flex items-center justify-center">
+                    <span className="text-2xl">📞</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900 dark:text-white">Phone Support</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{supportInfo.phone}</p>
+                  </div>
+                  <Button variant="outline" size="sm">Call</Button>
+                </a>
+              ) : (
+                <div className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 mb-3 opacity-50">
+                  <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                    <span className="text-2xl">📞</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900 dark:text-white">Phone Support</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Not available</p>
+                  </div>
+                </div>
+              )}
+
+              {supportInfo.email ? (
+                <a href={`mailto:${supportInfo.email}`} className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors mb-3">
+                  <div className="w-12 h-12 rounded-xl bg-green-100 dark:bg-green-950 flex items-center justify-center">
+                    <span className="text-2xl">📧</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900 dark:text-white">Email Support</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{supportInfo.email}</p>
+                  </div>
+                  <Button variant="outline" size="sm">Email</Button>
+                </a>
+              ) : (
+                <div className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 mb-3 opacity-50">
+                  <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                    <span className="text-2xl">📧</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900 dark:text-white">Email Support</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Not available</p>
+                  </div>
+                </div>
+              )}
+
+              {!supportInfo.phone && !supportInfo.email && (
+                <div className="text-center py-8 text-gray-400">
+                  <Headphones className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm">Contact your farm administrator for support.</p>
+                </div>
+              )}
             </Card>
           )}
         </div>

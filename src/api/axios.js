@@ -1,11 +1,11 @@
 import axios from 'axios';
-import { API_URL } from '../utils/constants';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const api = axios.create({
   baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 15000,
 });
 
 api.interceptors.request.use((config) => {
@@ -24,13 +24,9 @@ api.interceptors.response.use(
       localStorage.removeItem('farmwise_user');
       window.location.href = '/login';
     }
-
-    if (error.response?.status === 403 && error.response?.data?.code === 'TRIAL_EXPIRED') {
-      window.location.href = '/trial-expired';
-    }
-
     return Promise.reject(error);
   }
 );
 
 export default api;
+export { API_URL };

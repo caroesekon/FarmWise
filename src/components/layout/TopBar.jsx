@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Search, Bell, Sun, Moon, User, Settings, LogOut, ChevronDown, X, CheckCircle, Eye, Trash2 } from 'lucide-react';
+import { Menu, Search, Bell, Sun, Moon, User, Settings, LogOut, ChevronDown, X, CheckCircle, Eye, Trash2, Download } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAlerts } from '../../hooks/useAlerts';
 import { acknowledgeAlert, dismissAlert } from '../../api/alertApi';
 import { getInitials } from '../../utils/formatters';
+import { API_URL } from '../../api/axios';
 import clsx from 'clsx';
 
 export default function TopBar({ onMenuClick, isMobile }) {
@@ -16,6 +17,7 @@ export default function TopBar({ onMenuClick, isMobile }) {
   const [alertDropdownOpen, setAlertDropdownOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [hasDownloads, setHasDownloads] = useState(false);
   const dropdownRef = useRef(null);
   const alertRef = useRef(null);
   const searchRef = useRef(null);
@@ -24,6 +26,12 @@ export default function TopBar({ onMenuClick, isMobile }) {
   const alertCount = (summary?.critical || 0) + (summary?.high || 0);
 
   useEffect(() => {
+    fetch(`${API_URL}/downloads`).then(r => r.json()).then(d => {
+      if (d.success && (d.data?.windows || d.data?.android)) {
+        setHasDownloads(true);
+      }
+    }).catch(() => {});
+
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setDropdownOpen(false);
       if (alertRef.current && !alertRef.current.contains(e.target)) setAlertDropdownOpen(false);
@@ -64,7 +72,7 @@ export default function TopBar({ onMenuClick, isMobile }) {
     else if (query.includes('weather') || query.includes('rain')) navigate('/weather');
     else if (query.includes('report')) navigate('/reports');
     else if (query.includes('ai') || query.includes('assistant')) navigate('/ai');
-    else if (query.includes('settings')) navigate('/settings');
+    else if (query.includes('settings') || query.includes('download')) navigate('/settings');
     else navigate('/livestock');
     setSearchOpen(false);
     setSearchQuery('');
@@ -86,7 +94,19 @@ export default function TopBar({ onMenuClick, isMobile }) {
         <button onClick={onMenuClick} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
           <Menu className="h-5 w-5" />
         </button>
+
+        {hasDownloads && (
+          <button
+            onClick={() => navigate('/settings')}
+            className="hidden sm:flex items-center gap-1.5 text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/30 hover:bg-primary-100 dark:hover:bg-primary-900/30 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span>Download App</span>
+          </button>
+        )}
+
         {isMobile && <span className="text-lg font-bold text-gray-900 dark:text-white">FarmWise</span>}
+
         <div ref={searchRef} className="relative">
           {searchOpen ? (
             <form onSubmit={handleSearch} className="flex items-center">
@@ -107,10 +127,7 @@ export default function TopBar({ onMenuClick, isMobile }) {
         </button>
 
         <div className="relative" ref={alertRef}>
-          <button
-            onClick={() => setAlertDropdownOpen(!alertDropdownOpen)}
-            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 relative"
-          >
+          <button onClick={() => setAlertDropdownOpen(!alertDropdownOpen)} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 relative">
             <Bell className="h-5 w-5" />
             {alertCount > 0 && (
               <span className="absolute top-1 right-1 h-5 w-5 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold animate-pulse">
@@ -126,51 +143,31 @@ export default function TopBar({ onMenuClick, isMobile }) {
                   {alertCount > 0 ? `${alertCount} Active Alert${alertCount > 1 ? 's' : ''}` : 'No Active Alerts'}
                 </p>
                 {alertCount > 0 && (
-                  <button onClick={() => { setAlertDropdownOpen(false); navigate('/'); }} className="text-xs text-primary-600 hover:text-primary-700">
-                    View All
-                  </button>
+                  <button onClick={() => { setAlertDropdownOpen(false); navigate('/'); }} className="text-xs text-primary-600 hover:text-primary-700">View All</button>
                 )}
               </div>
 
               {alerts.filter(a => a.status === 'active').slice(0, 10).map((alert) => (
-                <div key={alert._id} className={`px-4 py-3 border-b border-gray-50 dark:border-gray-800/50 ${
-                  alert.level === 'critical' ? 'bg-red-50 dark:bg-red-950/20' :
-                  alert.level === 'high' ? 'bg-orange-50 dark:bg-orange-950/20' : ''
-                }`}>
+                <div key={alert._id} className={`px-4 py-3 border-b border-gray-50 dark:border-gray-800/50 ${alert.level === 'critical' ? 'bg-red-50 dark:bg-red-950/20' : alert.level === 'high' ? 'bg-orange-50 dark:bg-orange-950/20' : ''}`}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                        {alert.level === 'critical' && '🔴 '}
-                        {alert.level === 'high' && '🟠 '}
-                        {alert.title}
+                        {alert.level === 'critical' && '🔴 '}{alert.level === 'high' && '🟠 '}{alert.title}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{alert.description}</p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        {new Date(alert.createdAt).toLocaleDateString('en-KE', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </p>
+                      <p className="text-xs text-gray-400 mt-1">{new Date(alert.createdAt).toLocaleDateString('en-KE', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
                   </div>
                   <div className="flex gap-2 mt-2">
-                    <button
-                      onClick={() => handleAcknowledge(alert._id)}
-                      className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700"
-                    >
-                      <Eye className="h-3 w-3" /> Mark Read
-                    </button>
-                    <button
-                      onClick={() => handleDismiss(alert._id)}
-                      className="text-xs flex items-center gap-1 text-gray-400 hover:text-gray-600"
-                    >
-                      <Trash2 className="h-3 w-3" /> Dismiss
-                    </button>
+                    <button onClick={() => handleAcknowledge(alert._id)} className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700"><Eye className="h-3 w-3" /> Mark Read</button>
+                    <button onClick={() => handleDismiss(alert._id)} className="text-xs flex items-center gap-1 text-gray-400 hover:text-gray-600"><Trash2 className="h-3 w-3" /> Dismiss</button>
                   </div>
                 </div>
               ))}
 
               {alerts.filter(a => a.status === 'active').length === 0 && (
                 <div className="px-4 py-6 text-center text-sm text-gray-400">
-                  <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500" />
-                  All clear! No active alerts.
+                  <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500" />All clear! No active alerts.
                 </div>
               )}
             </div>
@@ -179,9 +176,7 @@ export default function TopBar({ onMenuClick, isMobile }) {
 
         <div className="relative" ref={dropdownRef}>
           <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-            <div className="h-8 w-8 rounded-full bg-primary-600 flex items-center justify-center text-white text-sm font-medium">
-              {getInitials(user?.name)}
-            </div>
+            <div className="h-8 w-8 rounded-full bg-primary-600 flex items-center justify-center text-white text-sm font-medium">{getInitials(user?.name)}</div>
             {!isMobile && (
               <>
                 <div className="hidden sm:block text-left">
@@ -200,17 +195,11 @@ export default function TopBar({ onMenuClick, isMobile }) {
                 <span className="inline-block mt-1 text-xs bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300 px-2 py-0.5 rounded-full capitalize">{user?.role}</span>
               </div>
               <div className="py-1">
-                <button onClick={() => { setDropdownOpen(false); navigate('/settings'); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                  <User className="h-4 w-4" />My Profile
-                </button>
-                <button onClick={() => { setDropdownOpen(false); navigate('/settings'); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                  <Settings className="h-4 w-4" />Settings
-                </button>
+                <button onClick={() => { setDropdownOpen(false); navigate('/settings'); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"><User className="h-4 w-4" />My Profile</button>
+                <button onClick={() => { setDropdownOpen(false); navigate('/settings'); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"><Settings className="h-4 w-4" />Settings</button>
               </div>
               <div className="border-t border-gray-100 dark:border-gray-800 py-1">
-                <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors">
-                  <LogOut className="h-4 w-4" />Logout
-                </button>
+                <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"><LogOut className="h-4 w-4" />Logout</button>
               </div>
             </div>
           )}
